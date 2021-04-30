@@ -198,8 +198,14 @@ class Model:
                         #                     predicted_strings]  # (batch, top-k, target_length)
                         #pred_file.write('\n'.join(
                         #    [' '.join(Common.filter_impossible_names(words)) for words in predicted_strings[0]]) + '\n')
+                        for i in range(k)[1:k]:
+                            predicted_file_name = model_dirname + '/pred_'+str(i)+'.txt'
+
+                            with open(predicted_file_name,'w') as pred_file_iter:
+                                pred_file_iter.write('\n'.join(
+                                    [' '.join(Common.filter_impossible_names(words)[:i]) for words in predicted_strings]) + '\n')
                         pred_file.write('\n'.join(
-                            [' '.join(Common.filter_impossible_names(words)[:1]) for words in predicted_strings]) + '\n')
+                                    [' '.join(Common.filter_impossible_names(words)[:1]) for words in predicted_strings]) + '\n')
                     else:
                         predicted_strings = [[self.index_to_target[i] for i in example]
                                              for example in predicted_indices]
@@ -278,12 +284,12 @@ class Model:
 
     def update_per_subtoken_statistics(self, results, true_positive, false_positive, false_negative, k):
         for original_name, predicted in results:
-            predicted = predicted[:k]
             #print(predicted)
             #if self.config.BEAM_WIDTH > 0:
             #    predicted = predicted[0]
             #print(predicted)
             filtered_predicted_names = Common.filter_impossible_names(predicted)
+            filtered_predicted_names = filtered_predicted_names[:k]
             filtered_original_subtokens = Common.filter_impossible_names(original_name.split(Common.internal_delimiter))
             #print(filtered_predicted_names)
             #print(filtered_original_subtokens)
@@ -294,12 +300,12 @@ class Model:
 
             for subtok in filtered_predicted_names:
                 if subtok in filtered_original_subtokens:
-                    true_positive += 1/len(filtered_original_subtokens)
+                    true_positive += 1/len(filtered_predicted_names)
                 else:
-                    false_positive += 1/len(filtered_original_subtokens)
+                    false_positive += 1/len(filtered_predicted_names)
             for subtok in filtered_original_subtokens:
                 if not subtok in filtered_predicted_names:
-                    false_negative += 1/len(filtered_original_subtokens)
+                    false_negative += 1/len(filtered_predicted_names)
         return true_positive, false_positive, false_negative
 
     def print_hyperparams(self):
