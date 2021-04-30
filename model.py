@@ -192,12 +192,14 @@ class Model:
                             [name.replace(Common.internal_delimiter, ' ') for name in true_target_strings]) + '\n')
                     if self.config.BEAM_WIDTH > 0:
                         # predicted indices: (batch, time, beam_width)
-                        predicted_strings = [[[self.index_to_target[i] for i in timestep] for timestep in example] for
+                        predicted_strings = [[self.index_to_target[i] for timestep in example for i in timestep ] for
                                              example in predicted_indices]
-                        predicted_strings = [list(map(list, zip(*example))) for example in
-                                             predicted_strings]  # (batch, top-k, target_length)
+                        #predicted_strings = [list(map(list, zip(*example))) for example in
+                        #                     predicted_strings]  # (batch, top-k, target_length)
+                        #pred_file.write('\n'.join(
+                        #    [' '.join(Common.filter_impossible_names(words)) for words in predicted_strings[0]]) + '\n')
                         pred_file.write('\n'.join(
-                            [' '.join(Common.filter_impossible_names(words)) for words in predicted_strings[0]]) + '\n')
+                            [' '.join(Common.filter_impossible_names(words)[:1]) for words in predicted_strings]) + '\n')
                     else:
                         predicted_strings = [[self.index_to_target[i] for i in example]
                                              for example in predicted_indices]
@@ -240,8 +242,8 @@ class Model:
             original_name_parts = original_name.split(Common.internal_delimiter) # list
             filtered_original = Common.filter_impossible_names(original_name_parts) # list
             predicted_first = predicted
-            if self.config.BEAM_WIDTH > 0:
-                predicted_first = predicted[0]
+            #if self.config.BEAM_WIDTH > 0:
+            #    predicted_first = predicted[0]
             filtered_predicted_first_parts = Common.filter_impossible_names(predicted_first) # list
 
             if self.config.BEAM_WIDTH == 0:
@@ -251,14 +253,23 @@ class Model:
                         filtered_predicted_first_parts) or ''.join(filtered_original) == ''.join(filtered_predicted_first_parts):
                     num_correct_predictions += 1
             else:
-                filtered_predicted = [Common.internal_delimiter.join(Common.filter_impossible_names(p)) for p in predicted]
-
+                #filtered_predicted = [Common.internal_delimiter.join(Common.filter_impossible_names(p)) for p in predicted]
+                filtered_predicted = Common.filter_impossible_names(predicted)
                 true_ref = original_name
                 output_file.write('Original: ' + ' '.join(original_name_parts) + '\n')
                 for i, p in enumerate(filtered_predicted):
-                    output_file.write('\t@{}: {}'.format(i + 1, ' '.join(p.split(Common.internal_delimiter)))+ '\n')
-                if true_ref in filtered_predicted:
-                    index_of_correct = filtered_predicted.index(true_ref)
+                    output_file.write('\t@{}: {}'.format(i + 1, ' '.join(p.split(Common.internal_delimiter))
+                                                         )+ '\n')
+
+                true_ref = true_ref.split(Common.internal_delimiter)
+                if(any(elem in true_ref for elem in filtered_predicted)):
+                #if true_ref in filtered_predicted:
+                    index_of_correct = 0
+                    for elem in filtered_predicted:
+                        if elem in true_ref:
+                            break
+                        index_of_correct += 1
+                    #index_of_correct = filtered_predicted.index(true_ref)
                     update = np.concatenate(
                         [np.zeros(index_of_correct, dtype=np.int32),
                          np.ones(self.config.BEAM_WIDTH - index_of_correct, dtype=np.int32)])
@@ -267,10 +278,15 @@ class Model:
 
     def update_per_subtoken_statistics(self, results, true_positive, false_positive, false_negative):
         for original_name, predicted in results:
-            if self.config.BEAM_WIDTH > 0:
-                predicted = predicted[0]
+            predicted = predicted[:3]
+            #print(predicted)
+            #if self.config.BEAM_WIDTH > 0:
+            #    predicted = predicted[0]
+            #print(predicted)
             filtered_predicted_names = Common.filter_impossible_names(predicted)
             filtered_original_subtokens = Common.filter_impossible_names(original_name.split(Common.internal_delimiter))
+            #print(filtered_predicted_names)
+            #print(filtered_original_subtokens)
 
             if ''.join(filtered_original_subtokens) == ''.join(filtered_predicted_names):
                 true_positive += len(filtered_original_subtokens)
@@ -278,12 +294,12 @@ class Model:
 
             for subtok in filtered_predicted_names:
                 if subtok in filtered_original_subtokens:
-                    true_positive += 1
+                    true_positive += 1/len(filtered_original_subtokens)
                 else:
-                    false_positive += 1
+                    false_positive += 1/len(filtered_original_subtokens)
             for subtok in filtered_original_subtokens:
                 if not subtok in filtered_predicted_names:
-                    false_negative += 1
+                    false_negative += 1/len(filtered_original_subtokens)
         return true_positive, false_positive, false_negative
 
     def print_hyperparams(self):
