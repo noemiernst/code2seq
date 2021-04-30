@@ -2,9 +2,9 @@ class Config:
     @staticmethod
     def get_default_config(args):
         config = Config(args)
-        config.NUM_EPOCHS = 3000
+        config.NUM_EPOCHS = 30
         config.SAVE_EVERY_EPOCHS = 1
-        config.PATIENCE = 10
+        config.PATIENCE = 4
         config.BATCH_SIZE = 512
         config.TEST_BATCH_SIZE = 256
         config.READER_NUM_PARALLEL_BATCHES = 1
@@ -18,13 +18,13 @@ class Config:
         config.DECODER_SIZE = 320
         config.NUM_DECODER_LAYERS = 1
         config.MAX_PATH_LENGTH = 8 + 1
-        config.MAX_NAME_PARTS = 5
-        config.MAX_TARGET_PARTS = 6
+        config.MAX_NAME_PARTS = 20
+        config.MAX_TARGET_PARTS = 0
         config.EMBEDDINGS_DROPOUT_KEEP_PROB = 0.75
         config.RNN_DROPOUT_KEEP_PROB = 0.5
         config.BIRNN = True
         config.RANDOM_CONTEXTS = True
-        config.BEAM_WIDTH = 0
+        config.BEAM_WIDTH = 10
         config.USE_MOMENTUM = True
         return config
 
