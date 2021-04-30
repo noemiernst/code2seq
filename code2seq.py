@@ -23,8 +23,10 @@ if __name__ == '__main__':
     parser.add_argument('--predict', action='store_true')
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--seed', type=int, default=239)
+    parser.add_argument('--k', type=int, default=1)
     args = parser.parse_args()
 
+    k = args.k
     np.random.seed(args.seed)
     tf.set_random_seed(args.seed)
 
@@ -38,13 +40,13 @@ if __name__ == '__main__':
     if config.TRAIN_PATH:
         model.train()
     if config.TEST_PATH and not args.data_path:
-        results, precision, recall, f1, rouge = model.evaluate()
+        results, precision, recall, f1, rouge = model.evaluate(k=k)
         print('Accuracy: ' + str(results))
-        print('Precision: ' + str(precision) + ', recall: ' + str(recall) + ', F1: ' + str(f1))
+        print('Precision @'+ str(k) +': ' + str(precision) + ', recall @'+ str(k) +': ' + str(recall) + ', F1 @'+ str(k) +': ' + str(f1))
         print('Rouge: ', rouge)
     if args.predict:
         predictor = InteractivePredictor(config, model)
         predictor.predict()
     if args.release and args.load_path:
-        model.evaluate(release=True)
+        model.evaluate(release=True, k=k)
     model.close_session()

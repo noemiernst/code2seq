@@ -142,7 +142,7 @@ class Model:
                                                                               self.config.BATCH_SIZE * self.num_batches_to_log / (
                                                                                   multi_batch_elapsed if multi_batch_elapsed > 0 else 1)))
 
-    def evaluate(self, release=False):
+    def evaluate(self, release=False, k=1):
         eval_start_time = time.time()
         if self.eval_queue is None:
             self.eval_queue = reader.Reader(subtoken_to_index=self.subtoken_to_index,
@@ -211,7 +211,7 @@ class Model:
                                                                                   predicted_strings))
                     true_positive, false_positive, false_negative = self.update_per_subtoken_statistics(
                         zip(true_target_strings, predicted_strings),
-                        true_positive, false_positive, false_negative)
+                        true_positive, false_positive, false_negative, k)
 
                     total_predictions += len(true_target_strings)
                     total_prediction_batches += 1
@@ -276,9 +276,9 @@ class Model:
                     num_correct_predictions += update
         return num_correct_predictions
 
-    def update_per_subtoken_statistics(self, results, true_positive, false_positive, false_negative):
+    def update_per_subtoken_statistics(self, results, true_positive, false_positive, false_negative, k):
         for original_name, predicted in results:
-            predicted = predicted[:3]
+            predicted = predicted[:k]
             #print(predicted)
             #if self.config.BEAM_WIDTH > 0:
             #    predicted = predicted[0]
