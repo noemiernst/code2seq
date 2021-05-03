@@ -172,7 +172,7 @@ class Model:
 
         with open(model_dirname + '/log.txt', 'w') as output_file, open(ref_file_name, 'w') as ref_file, open(
                 predicted_file_name,
-                'w') as pred_file:
+                'w') as pred_file, open(model_dirname + '/pred_top5.txt', 'w') as top_pred_file:
             num_correct_predictions = 0 if self.config.BEAM_WIDTH == 0 \
                 else np.zeros([self.config.BEAM_WIDTH], dtype=np.int32)
             total_predictions = 0
@@ -199,6 +199,10 @@ class Model:
                                              predicted_strings]  # (batch, top-k, target_length)
                         pred_file.write('\n'.join(
                             [' '.join(Common.filter_impossible_names(words)) for words in predicted_strings[0]]) + '\n')
+                        for top_pred in predicted_strings:
+                            top = [Common.filter_impossible_names(pred) for pred in top_pred]
+                            top = [pred[0] for pred in top if pred != []][:5]
+                            top_pred_file.write(' '.join(top) + "\n")
                     else:
                         predicted_strings = [[self.index_to_target[i] for i in example]
                                              for example in predicted_indices]
