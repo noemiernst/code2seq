@@ -178,6 +178,7 @@ class Model:
             total_predictions = 0
             total_prediction_batches = 0
             true_positive, false_positive, false_negative = 0, 0, 0
+            precision_atk, recall_atk, predictions_atk = 0, 0, 0
             self.eval_queue.reset(self.sess)
             start_time = time.time()
 
@@ -192,20 +193,12 @@ class Model:
                             [name.replace(Common.internal_delimiter, ' ') for name in true_target_strings]) + '\n')
                     if self.config.BEAM_WIDTH > 0:
                         # predicted indices: (batch, time, beam_width)
-                        predicted_strings = [[self.index_to_target[i] for timestep in example for i in timestep ] for
+                        predicted_strings = [[[self.index_to_target[i] for i in timestep] for timestep in example] for
                                              example in predicted_indices]
-                        #predicted_strings = [list(map(list, zip(*example))) for example in
-                        #                     predicted_strings]  # (batch, top-k, target_length)
-                        #pred_file.write('\n'.join(
-                        #    [' '.join(Common.filter_impossible_names(words)) for words in predicted_strings[0]]) + '\n')
-                        for i in range(k)[1:k]:
-                            predicted_file_name = model_dirname + '/pred_'+str(i)+'.txt'
-
-                            with open(predicted_file_name,'w') as pred_file_iter:
-                                pred_file_iter.write('\n'.join(
-                                    [' '.join(Common.filter_impossible_names(words)[:i]) for words in predicted_strings]) + '\n')
+                        predicted_strings = [list(map(list, zip(*example))) for example in
+                                             predicted_strings]  # (batch, top-k, target_length)
                         pred_file.write('\n'.join(
-                                    [' '.join(Common.filter_impossible_names(words)[:1]) for words in predicted_strings]) + '\n')
+                            [' '.join(Common.filter_impossible_names(words)) for words in predicted_strings[0]]) + '\n')
                     else:
                         predicted_strings = [[self.index_to_target[i] for i in example]
                                              for example in predicted_indices]
@@ -215,9 +208,9 @@ class Model:
                     num_correct_predictions = self.update_correct_predictions(num_correct_predictions, output_file,
                                                                               zip(true_target_strings,
                                                                                   predicted_strings))
-                    true_positive, false_positive, false_negative = self.update_per_subtoken_statistics(
+                    true_positive, false_positive, false_negative, precision_atk, recall_atk, predictions_atk = self.update_per_subtoken_statistics(
                         zip(true_target_strings, predicted_strings),
-                        true_positive, false_positive, false_negative, k)
+                        true_positive, false_positive, false_negative, precision_atk, recall_atk, predictions_atk, k)
 
                     total_predictions += len(true_target_strings)
                     total_prediction_batches += 1
@@ -228,6 +221,10 @@ class Model:
                 pass
 
             print('Done testing, epoch reached')
+            print("---")
+            print("Precision at " + str(k) + ": " + str(precision_atk/predictions_atk))
+            print("Recall " + str(k) + ": " + str(recall_atk/predictions_atk))
+            print("---")
             output_file.write(str(num_correct_predictions / total_predictions) + '\n')
             # Common.compute_bleu(ref_file_name, predicted_file_name)
 
@@ -235,8 +232,9 @@ class Model:
         precision, recall, f1 = self.calculate_results(true_positive, false_positive, false_negative)
         try:
             files_rouge = FilesRouge()
-            rouge = files_rouge.get_scores(
-                hyp_path=predicted_file_name, ref_path=ref_file_name, avg=True, ignore_empty=True)
+            #rouge = files_rouge.get_scores(
+            #    hyp_path=predicted_file_name, ref_path=ref_file_name, avg=True, ignore_empty=True)
+            rouge = 0
         except ValueError:
             rouge = 0
         print("Evaluation time: %sh%sm%ss" % ((elapsed // 60 // 60), (elapsed // 60) % 60, elapsed % 60))
@@ -248,8 +246,8 @@ class Model:
             original_name_parts = original_name.split(Common.internal_delimiter) # list
             filtered_original = Common.filter_impossible_names(original_name_parts) # list
             predicted_first = predicted
-            #if self.config.BEAM_WIDTH > 0:
-            #    predicted_first = predicted[0]
+            if self.config.BEAM_WIDTH > 0:
+                predicted_first = predicted[0]
             filtered_predicted_first_parts = Common.filter_impossible_names(predicted_first) # list
 
             if self.config.BEAM_WIDTH == 0:
@@ -259,54 +257,58 @@ class Model:
                         filtered_predicted_first_parts) or ''.join(filtered_original) == ''.join(filtered_predicted_first_parts):
                     num_correct_predictions += 1
             else:
-                #filtered_predicted = [Common.internal_delimiter.join(Common.filter_impossible_names(p)) for p in predicted]
-                filtered_predicted = Common.filter_impossible_names(predicted)
+                filtered_predicted = [Common.internal_delimiter.join(Common.filter_impossible_names(p)) for p in predicted]
+
                 true_ref = original_name
                 output_file.write('Original: ' + ' '.join(original_name_parts) + '\n')
                 for i, p in enumerate(filtered_predicted):
-                    output_file.write('\t@{}: {}'.format(i + 1, ' '.join(p.split(Common.internal_delimiter))
-                                                         )+ '\n')
-
-                true_ref = true_ref.split(Common.internal_delimiter)
-                if(any(elem in true_ref for elem in filtered_predicted)):
-                #if true_ref in filtered_predicted:
-                    index_of_correct = 0
-                    for elem in filtered_predicted:
-                        if elem in true_ref:
-                            break
-                        index_of_correct += 1
-                    #index_of_correct = filtered_predicted.index(true_ref)
+                    output_file.write('\t@{}: {}'.format(i + 1, ' '.join(p.split(Common.internal_delimiter)))+ '\n')
+                if true_ref in filtered_predicted:
+                    index_of_correct = filtered_predicted.index(true_ref)
                     update = np.concatenate(
                         [np.zeros(index_of_correct, dtype=np.int32),
                          np.ones(self.config.BEAM_WIDTH - index_of_correct, dtype=np.int32)])
                     num_correct_predictions += update
         return num_correct_predictions
 
-    def update_per_subtoken_statistics(self, results, true_positive, false_positive, false_negative, k):
+    def update_per_subtoken_statistics(self, results, true_positive, false_positive, false_negative, precision_atk, recall_atk, predictions_atk, k):
         for original_name, predicted in results:
-            #print(predicted)
-            #if self.config.BEAM_WIDTH > 0:
-            #    predicted = predicted[0]
-            #print(predicted)
+            filtered_predicted_names_k = [Common.filter_impossible_names(pred) for pred in predicted]
+            filtered_k_predictions = [pred[0] for pred in filtered_predicted_names_k if pred != []][:k]
+            if self.config.BEAM_WIDTH > 0:
+                predicted = predicted[0]
             filtered_predicted_names = Common.filter_impossible_names(predicted)
-            filtered_predicted_names = filtered_predicted_names[:k]
             filtered_original_subtokens = Common.filter_impossible_names(original_name.split(Common.internal_delimiter))
-            #print(filtered_predicted_names)
-            #print(filtered_original_subtokens)
 
             if ''.join(filtered_original_subtokens) == ''.join(filtered_predicted_names):
                 true_positive += len(filtered_original_subtokens)
-                continue
+            else:
+                for subtok in filtered_predicted_names:
+                    if subtok in filtered_original_subtokens:
+                        true_positive += 1
+                    else:
+                        false_positive += 1
+                for subtok in filtered_original_subtokens:
+                    if not subtok in filtered_predicted_names:
+                        false_negative += 1
 
-            for subtok in filtered_predicted_names:
+            # precision: #relevant items retrieved/ #items retrieved = TP/#retrieved names = TP/(TP+FP)
+            # recall:    #relevant items retrieved/ #relevant items = TP/#original subtokens = TP/(TP+FN)
+            TP, FP, FN = 0, 0, 0
+            for subtok in filtered_k_predictions:
                 if subtok in filtered_original_subtokens:
-                    true_positive += 1/len(filtered_predicted_names)
+                    TP += 1
                 else:
-                    false_positive += 1/len(filtered_predicted_names)
+                    FP += 1
             for subtok in filtered_original_subtokens:
-                if not subtok in filtered_predicted_names:
-                    false_negative += 1/len(filtered_predicted_names)
-        return true_positive, false_positive, false_negative
+                if not subtok in filtered_k_predictions:
+                    FN += 1
+
+            precision_atk += TP/(TP+FP)
+            recall_atk += TP/(TP+FN)
+            predictions_atk += 1
+
+        return true_positive, false_positive, false_negative, precision_atk, recall_atk, predictions_atk
 
     def print_hyperparams(self):
         print('Training batch size:\t\t\t', self.config.BATCH_SIZE)

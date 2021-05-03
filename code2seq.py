@@ -42,7 +42,7 @@ if __name__ == '__main__':
     if config.TEST_PATH and not args.data_path:
         results, precision, recall, f1, rouge = model.evaluate(k=k)
         print('Accuracy: ' + str(results))
-        print('Precision @'+ str(k) +': ' + str(precision) + ', recall @'+ str(k) +': ' + str(recall) + ', F1 @'+ str(k) +': ' + str(f1))
+        print('Precision: ' + str(precision) + ', recall: ' + str(recall) + ', F1: ' + str(f1))
         print('Rouge: ', rouge)
     if args.predict:
         predictor = InteractivePredictor(config, model)
