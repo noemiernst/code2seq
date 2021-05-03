@@ -17,9 +17,9 @@ class Config:
         config.RNN_SIZE = 128 * 2  # Two LSTMs to embed paths, each of size 128
         config.DECODER_SIZE = 320
         config.NUM_DECODER_LAYERS = 1
-        config.MAX_PATH_LENGTH = 8 + 1
+        config.MAX_PATH_LENGTH = 6 + 1
         config.MAX_NAME_PARTS = 20
-        config.MAX_TARGET_PARTS = 0
+        config.MAX_TARGET_PARTS = 5
         config.EMBEDDINGS_DROPOUT_KEEP_PROB = 0.75
         config.RNN_DROPOUT_KEEP_PROB = 0.5
         config.BIRNN = True
